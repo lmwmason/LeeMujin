@@ -125,7 +125,6 @@ class handler(BaseHTTPRequestHandler):
         query = urlparse(self.path).query
 
         try:
-            # 경로별 라우팅
             if path == '/api/songs' or query == 'type=songs':
                 all_videos = get_all_videos()
                 if all_videos:
@@ -177,7 +176,6 @@ class handler(BaseHTTPRequestHandler):
                     self.send_error_response(500, "데이터를 새로고침하는 데 실패했습니다.")
                     return
             else:
-                # API 홈
                 response_data = {
                     "message": "LeeMujin API",
                     "endpoints": [
@@ -189,7 +187,6 @@ class handler(BaseHTTPRequestHandler):
                     ]
                 }
 
-            # 성공 응답 전송
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
             self.send_header('Access-Control-Allow-Origin', '*')
