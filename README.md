@@ -74,7 +74,7 @@ Help Lee Mujin fans easily find the type of content they want to watch. Whether 
 ```bash
 # Backend
 pip install flask
-python app.py
+python index.py
 
 # Frontend
 npm install
