@@ -1,3 +1,4 @@
+from vercel_wsgi import handle_request
 from flask import Flask, jsonify
 import requests
 from bs4 import BeautifulSoup
@@ -124,9 +125,9 @@ def classify_videos(video_list):
 
 @app.route('/')
 def home():
-    return "LeeMujin api"
+    return jsonify({"message": "LeeMujin API"})
 
-@app.route('/refresh_data', methods=['GET'])
+@app.route('/refresh_data')
 def refresh_data():
     try:
         all_videos = get_all_videos()
@@ -145,7 +146,7 @@ def refresh_data():
     except Exception as e:
         return jsonify({"message": f"오류가 발생했습니다: {str(e)}"}), 500
 
-@app.route('/songs', methods=['GET'])
+@app.route('/songs')
 def get_songs():
     try:
         all_videos = get_all_videos()
@@ -157,7 +158,7 @@ def get_songs():
     except Exception as e:
         return jsonify({"message": f"오류가 발생했습니다: {str(e)}"}), 500
 
-@app.route('/commute', methods=['GET'])
+@app.route('/commute')
 def get_commute():
     try:
         all_videos = get_all_videos()
@@ -169,7 +170,7 @@ def get_commute():
     except Exception as e:
         return jsonify({"message": f"오류가 발생했습니다: {str(e)}"}), 500
 
-@app.route('/entertainment', methods=['GET'])
+@app.route('/entertainment')
 def get_entertainment():
     try:
         all_videos = get_all_videos()
@@ -181,7 +182,7 @@ def get_entertainment():
     except Exception as e:
         return jsonify({"message": f"오류가 발생했습니다: {str(e)}"}), 500
 
-@app.route('/all', methods=['GET'])
+@app.route('/all')
 def get_all():
     try:
         all_videos = get_all_videos()
@@ -193,6 +194,6 @@ def get_all():
     except Exception as e:
         return jsonify({"message": f"오류가 발생했습니다: {str(e)}"}), 500
 
-# Vercel serverless function handler
+# Vercel handler
 def handler(environ, start_response):
-    return app.wsgi_app(environ, start_response)
+    return handle_request(app, environ, start_response)
