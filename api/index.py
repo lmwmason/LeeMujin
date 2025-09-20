@@ -1,11 +1,10 @@
-from vercel_wsgi import handle_request
-from flask import Flask, jsonify
+from http.server import BaseHTTPRequestHandler
+import json
 import requests
 from bs4 import BeautifulSoup
 import re
-import json
+from urllib.parse import urlparse
 
-app = Flask(__name__)
 
 def get_search_results(query):
     base_url = "https://www.youtube.com/results"
@@ -36,8 +35,9 @@ def get_search_results(query):
         video_list = []
         try:
             contents = \
-            data['contents']['twoColumnSearchResultsRenderer']['primaryContents']['sectionListRenderer']['contents'][0][
-                'itemSectionRenderer']['contents']
+                data['contents']['twoColumnSearchResultsRenderer']['primaryContents']['sectionListRenderer'][
+                    'contents'][0][
+                    'itemSectionRenderer']['contents']
 
             for content in contents:
                 video_renderer = content.get('videoRenderer')
@@ -55,30 +55,24 @@ def get_search_results(query):
     except requests.exceptions.RequestException:
         return []
 
+
 def get_all_videos():
     search_queries = [
-        # 1-5: 기본 핵심 검색어 (가장 많이 검색되는)
         '이무진',
         '이무진 라이브',
         '이무진 리무진서비스',
         'Lee Mujin',
         '이무진 노래',
-
-        # 6-10: 인기 프로그램/콘텐츠
         '이무진 출근길',
         '이무진 불후의명곡',
         '이무진 커버',
         'Lee Mujin live',
         '이무진 콘서트',
-
-        # 11-15: 협업/화제 검색어
         '이무진 아이유',
         '이무진 인터뷰',
         '이무진 유튜브',
         'Lee Mujin song',
         '이무진 OST',
-
-        # 16-20: 트렌드/감정 검색어
         '이무진 레전드',
         '이무진 2024',
         'Lee Mujin cover',
@@ -90,10 +84,10 @@ def get_all_videos():
     for query in search_queries:
         videos = get_search_results(query)
         for video in videos:
-            # 링크를 키로 사용하여 중복을 제거합니다.
             all_videos[video['link']] = video
 
     return list(all_videos.values())
+
 
 def classify_videos(video_list):
     classified_videos = {
@@ -123,77 +117,105 @@ def classify_videos(video_list):
 
     return classified_videos
 
-@app.route('/')
-def home():
-    return jsonify({"message": "LeeMujin API"})
 
-@app.route('/refresh_data')
-def refresh_data():
-    try:
-        all_videos = get_all_videos()
-        if all_videos:
-            data_cache = classify_videos(all_videos)
-            return jsonify({
-                "message": "데이터가 성공적으로 새로고침되었습니다.",
-                "total_videos": len(all_videos),
-                "songs": len(data_cache['songs']),
-                "commute": len(data_cache['commute']),
-                "entertainment": len(data_cache['entertainment']),
-                "etc": len(data_cache['etc'])
-            })
-        else:
-            return jsonify({"message": "데이터를 새로고침하는 데 실패했습니다."}), 500
-    except Exception as e:
-        return jsonify({"message": f"오류가 발생했습니다: {str(e)}"}), 500
+class handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        # Parse the path
+        path = urlparse(self.path).path
 
-@app.route('/songs')
-def get_songs():
-    try:
-        all_videos = get_all_videos()
-        if all_videos:
-            data_cache = classify_videos(all_videos)
-            return jsonify(data_cache['songs'])
-        else:
-            return jsonify({"message": "데이터를 로드할 수 없습니다."}), 503
-    except Exception as e:
-        return jsonify({"message": f"오류가 발생했습니다: {str(e)}"}), 500
+        # Remove leading slash
+        if path.startswith('/'):
+            path = path[1:]
 
-@app.route('/commute')
-def get_commute():
-    try:
-        all_videos = get_all_videos()
-        if all_videos:
-            data_cache = classify_videos(all_videos)
-            return jsonify(data_cache['commute'])
-        else:
-            return jsonify({"message": "데이터를 로드할 수 없습니다."}), 503
-    except Exception as e:
-        return jsonify({"message": f"오류가 발생했습니다: {str(e)}"}), 500
+        # Route handling
+        try:
+            if path == '' or path == 'api':
+                # Home page
+                response_data = {"message": "LeeMujin API"}
 
-@app.route('/entertainment')
-def get_entertainment():
-    try:
-        all_videos = get_all_videos()
-        if all_videos:
-            data_cache = classify_videos(all_videos)
-            return jsonify(data_cache['entertainment'])
-        else:
-            return jsonify({"message": "데이터를 로드할 수 없습니다."}), 503
-    except Exception as e:
-        return jsonify({"message": f"오류가 발생했습니다: {str(e)}"}), 500
+            elif path == 'songs' or path == 'api/songs':
+                all_videos = get_all_videos()
+                if all_videos:
+                    data_cache = classify_videos(all_videos)
+                    response_data = data_cache['songs']
+                else:
+                    self.send_response(503)
+                    self.send_header('Content-type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"message": "데이터를 로드할 수 없습니다."}).encode())
+                    return
 
-@app.route('/all')
-def get_all():
-    try:
-        all_videos = get_all_videos()
-        if all_videos:
-            data_cache = classify_videos(all_videos)
-            return jsonify(data_cache)
-        else:
-            return jsonify({"message": "데이터를 로드할 수 없습니다."}), 503
-    except Exception as e:
-        return jsonify({"message": f"오류가 발생했습니다: {str(e)}"}), 500
+            elif path == 'commute' or path == 'api/commute':
+                all_videos = get_all_videos()
+                if all_videos:
+                    data_cache = classify_videos(all_videos)
+                    response_data = data_cache['commute']
+                else:
+                    self.send_response(503)
+                    self.send_header('Content-type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"message": "데이터를 로드할 수 없습니다."}).encode())
+                    return
 
-# Vercel handler
-def handler(environ, start_response):
-    return handle_request(app, environ, start_response)
+            elif path == 'entertainment' or path == 'api/entertainment':
+                all_videos = get_all_videos()
+                if all_videos:
+                    data_cache = classify_videos(all_videos)
+                    response_data = data_cache['entertainment']
+                else:
+                    self.send_response(503)
+                    self.send_header('Content-type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"message": "데이터를 로드할 수 없습니다."}).encode())
+                    return
+
+            elif path == 'all' or path == 'api/all':
+                all_videos = get_all_videos()
+                if all_videos:
+                    response_data = classify_videos(all_videos)
+                else:
+                    self.send_response(503)
+                    self.send_header('Content-type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"message": "데이터를 로드할 수 없습니다."}).encode())
+                    return
+
+            elif path == 'refresh_data' or path == 'api/refresh_data':
+                all_videos = get_all_videos()
+                if all_videos:
+                    data_cache = classify_videos(all_videos)
+                    response_data = {
+                        "message": "데이터가 성공적으로 새로고침되었습니다.",
+                        "total_videos": len(all_videos),
+                        "songs": len(data_cache['songs']),
+                        "commute": len(data_cache['commute']),
+                        "entertainment": len(data_cache['entertainment']),
+                        "etc": len(data_cache['etc'])
+                    }
+                else:
+                    self.send_response(500)
+                    self.send_header('Content-type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"message": "데이터를 새로고침하는 데 실패했습니다."}).encode())
+                    return
+            else:
+                # 404 Not Found
+                self.send_response(404)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({"message": "Not Found"}).encode())
+                return
+
+            # Send successful response
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            self.wfile.write(json.dumps(response_data, ensure_ascii=False).encode('utf-8'))
+
+        except Exception as e:
+            # Error handling
+            self.send_response(500)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps({"message": f"오류가 발생했습니다: {str(e)}"}, ensure_ascii=False).encode('utf-8'))
